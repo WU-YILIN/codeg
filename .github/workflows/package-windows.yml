@@ -1,0 +1,101 @@
+name: Package Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/media-preview
+    paths:
+      - .github/workflows/package-windows.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 90
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      TAURI_TARGET_TRIPLE: x86_64-pc-windows-msvc
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Keep checked-out sources in LF format
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: ./src-tauri -> target
+          shared-key: package-windows-x64
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify multimedia previews
+        run: >-
+          pnpm test src/lib/media-preview.test.ts
+          src/lib/file-tab-memory.test.ts
+          src/contexts/workspace-context.test.tsx
+          src/components/files/media-preview.test.tsx
+          src/components/files/file-document-view-media.test.tsx
+          src/components/files/file-viewer-drawer.test.tsx
+          src/components/canvas/file-card-wiring.test.ts
+          src/components/canvas/nodes/file-node.test.tsx
+          --maxWorkers=2
+
+      - name: Build standalone NSIS installer
+        shell: pwsh
+        run: |
+          $config = Join-Path $env:RUNNER_TEMP 'codeg-local-build.json'
+          '{"bundle":{"createUpdaterArtifacts":false}}' | Set-Content -LiteralPath $config -Encoding utf8
+          pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis --config $config
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Record build provenance and checksums
+        shell: pwsh
+        run: |
+          $release = 'src-tauri/target/x86_64-pc-windows-msvc/release'
+          $installer = @(Get-ChildItem "$release/bundle/nsis/*.exe")
+          if ($installer.Count -ne 1) { throw 'Expected exactly one NSIS installer' }
+          $files = @($installer[0].FullName, "$release/codeg.exe")
+          $checksums = @($files | ForEach-Object {
+            $hash = Get-FileHash -LiteralPath $_ -Algorithm SHA256
+            @{ name = (Split-Path $_ -Leaf); sha256 = $hash.Hash.ToLowerInvariant() }
+          })
+          @{
+            commit = $env:GITHUB_SHA
+            runId = $env:GITHUB_RUN_ID
+            version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+            files = $checksums
+          } | ConvertTo-Json -Depth 4 | Set-Content "$release/build-info.json" -Encoding utf8
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codeg-windows-x64-${{ github.sha }}
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/codeg.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/build-info.json
+          if-no-files-found: error
+          retention-days: 14
