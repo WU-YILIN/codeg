@@ -26,6 +26,7 @@ import {
 } from "@/contexts/workspace-context"
 import { BrowserTabView } from "@/components/browser/browser-tab-view"
 import { ImagePreview } from "@/components/files/image-preview"
+import { MediaPreview } from "@/components/files/media-preview"
 import { HtmlPreview } from "@/components/files/html-preview"
 import { MarkdownDocumentPreview } from "@/components/files/markdown-document-preview"
 import {
@@ -1884,6 +1885,14 @@ function FileWorkspacePanelBody() {
   // Image preview
   if (isFileTab && activeFileTab && activeFileTab.language === "image") {
     return <ImagePreview key={activeFileTab.id} tab={activeFileTab} />
+  }
+
+  if (
+    isFileTab &&
+    activeFileTab &&
+    (activeFileTab.language === "audio" || activeFileTab.language === "video")
+  ) {
+    return <MediaPreview key={activeFileTab.id} tab={activeFileTab} />
   }
 
   // PDF preview (PDF.js). Preview-only like an image: the bytes are binary,

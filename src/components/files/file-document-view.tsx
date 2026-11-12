@@ -7,6 +7,7 @@ import type { BundledLanguage } from "shiki"
 import { CodeBlockContent } from "@/components/ai-elements/code-block"
 import { HtmlPreview } from "@/components/files/html-preview"
 import { ImagePreview } from "@/components/files/image-preview"
+import { MediaPreview } from "@/components/files/media-preview"
 import { MarkdownDocumentPreview } from "@/components/files/markdown-document-preview"
 import { OfficePreview } from "@/components/files/office-preview"
 import { PdfPreview } from "@/components/files/pdf-preview"
@@ -22,6 +23,7 @@ import { isHtmlPreviewable } from "@/lib/language-detect"
  * the surfaces can never disagree about what a tab holds:
  *
  *   language "image"  → ImagePreview      (content is a data: URL)
+ *   "audio" / "video" → MediaPreview     (read-only binary media)
  *   language "pdf"    → PdfPreview        (content is a data: URL)
  *   language "office" → OfficePreview     (an officecli watch, no bytes here)
  *   HTML + preview on → HtmlPreview
@@ -127,6 +129,9 @@ export function FileDocumentView({
   // does.
   if (tab.language === "image") {
     return <ImagePreview key={tab.id} tab={tab} />
+  }
+  if (tab.language === "audio" || tab.language === "video") {
+    return <MediaPreview key={tab.id} tab={tab} />
   }
   if (tab.language === "pdf") {
     return <PdfPreview key={tab.id} tab={tab} />

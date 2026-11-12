@@ -17,6 +17,7 @@ import {
   FileDocumentView,
 } from "@/components/files/file-document-view"
 import { useWorkbenchRoute } from "@/contexts/workbench-route-context"
+import { useOverlayHostHidden } from "@/components/ui/overlay-host-hidden"
 import {
   useWorkspaceActions,
   useWorkspaceFileTabs,
@@ -68,6 +69,7 @@ export const FileNode = memo(function FileNode({
   const {
     openFilePreview,
     reloadOpenFileBackground,
+    retainFileTabContent,
     switchFileTab,
     toggleFileTabPreview,
   } = useWorkspaceActions()
@@ -87,6 +89,17 @@ export const FileNode = memo(function FileNode({
     [fileTabs, tabId]
   )
   const hasTab = tab !== null
+  const hostHidden = useOverlayHostHidden()
+
+  // A canvas card is visible without selecting its tab in the file column.
+  // Hold its bytes against the hidden-tab budget only while this host paints.
+  useEffect(() => {
+    if (!tabId || hostHidden) return
+    return retainFileTabContent(tabId)
+  }, [hostHidden, retainFileTabContent, tabId])
+  const needsReload = Boolean(
+    tab?.stale && !tab.isDirty && !tab.loading && tab.saveState !== "error"
+  )
 
   // Set when the open settled without producing a tab at all — the path names
   // nothing this client can read. A LOAD failure is not this: that comes back
@@ -99,7 +112,7 @@ export const FileNode = memo(function FileNode({
   // closed it in the file column while the card was off-screen — and costs
   // nothing when it is already there: `decideLoad` short-circuits on the cache.
   useEffect(() => {
-    if (!path || hasTab) return
+    if (!path || hostHidden || (hasTab && !needsReload)) return
     let cancelled = false
     const settle = (absPath: string | null) => {
       if (!cancelled) setUnresolvable(absPath === null)
@@ -110,7 +123,7 @@ export const FileNode = memo(function FileNode({
     return () => {
       cancelled = true
     }
-  }, [hasTab, openFilePreview, path])
+  }, [hasTab, hostHidden, needsReload, openFilePreview, path])
 
   const io = useMemo(() => (path ? splitAbsPath(path) : null), [path])
   // Root for markdown/HTML sub-resource resolution — the owning registered

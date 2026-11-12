@@ -65,6 +65,11 @@ import {
   languageFromPath,
 } from "@/lib/language-detect"
 import {
+  getMediaMimeType,
+  getMediaPreviewType,
+  type MediaPreviewType,
+} from "@/lib/media-preview"
+import {
   loadImageDiffSides,
   type ImageDiffSides,
   type ImageDiffSource,
@@ -267,6 +272,10 @@ export interface WorkspaceActionsValue {
   // activeFileTabId. No-op when no tab matches or when the tab has unsaved
   // local edits (use markTabsStale for that case).
   reloadOpenFileBackground: (path: string) => Promise<void>
+  // Keep a tab's bytes while another visible surface (e.g. a canvas card)
+  // renders it without selecting it in the file column. Release on hide or
+  // unmount. Multiple readers of one tab hold independent claims.
+  retainFileTabContent: (tabId: string) => () => void
   // Write prefetched file content into the open tab matching the absolute
   // `path` without issuing a second readFileForEdit. Used by the
   // change-detection watcher whose resolver has already paid for the read —
@@ -549,18 +558,19 @@ const IMAGE_MIME: Record<string, string> = {
 // past the 20 MB that `read_file_base64` defaults to, a default sized for
 // images, so a PDF asks for the backend's own ceiling instead (it clamps).
 const PDF_READ_MAX_BYTES = 100_000_000
+const MEDIA_READ_MAX_BYTES = 100_000_000
 
-type BinaryPreviewKind = "image" | "pdf"
+type BinaryPreviewKind = "image" | "pdf" | MediaPreviewType
 
 /**
- * Images and PDFs: the files a tab holds as a base64 `data:` URL rather than
+ * Images, PDFs and media: files a tab holds as a base64 `data:` URL rather than
  * as text. The kind doubles as the tab's synthetic `language`, which is what
  * every renderer branches on. Null for every other file.
  */
 function binaryPreviewKind(absPath: string): BinaryPreviewKind | null {
   if (isImageFile(absPath)) return "image"
   if (isPdfFile(absPath)) return "pdf"
-  return null
+  return getMediaPreviewType(absPath)
 }
 
 async function readBinaryPreview(
@@ -570,6 +580,11 @@ async function readBinaryPreview(
   if (kind === "pdf") {
     const b64 = await readFileBase64(absPath, PDF_READ_MAX_BYTES)
     return `data:application/pdf;base64,${b64}`
+  }
+  if (kind === "audio" || kind === "video") {
+    const mime = getMediaMimeType(absPath) ?? "application/octet-stream"
+    const b64 = await readFileBase64(absPath, MEDIA_READ_MAX_BYTES)
+    return `data:${mime};base64,${b64}`
   }
   const ext = absPath.split(".").pop()?.toLowerCase() ?? ""
   const mime = IMAGE_MIME[ext] ?? "image/png"
@@ -642,6 +657,27 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
   const [activePane, setActivePaneState] =
     useState<WorkspacePane>("conversation")
   const [fileTabs, setFileTabs] = useState<FileWorkspaceTab[]>([])
+  const fileContentClaimsRef = useRef(new Map<string, number>())
+  const [fileContentClaimsRevision, setFileContentClaimsRevision] = useState(0)
+  const retainFileTabContent = useCallback((tabId: string) => {
+    const claims = fileContentClaimsRef.current
+    const previous = claims.get(tabId) ?? 0
+    claims.set(tabId, previous + 1)
+    if (previous === 0) setFileContentClaimsRevision((revision) => revision + 1)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      const count = claims.get(tabId) ?? 0
+      if (count > 1) {
+        claims.set(tabId, count - 1)
+      } else {
+        claims.delete(tabId)
+        // Reconsider the budget even if no tab content changed on hide.
+        setFileContentClaimsRevision((revision) => revision + 1)
+      }
+    }
+  }, [])
   const [normalActiveFileTabId, setNormalActiveFileTabId] = useState<
     string | null
   >(null)
@@ -2141,6 +2177,9 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           absPath,
           binary ?? (office ? "office" : languageFromPath(absPath))
         )
+        // Binary tabs stay preview-only even while loading or after a read
+        // failure; a failed media read must never expose a text editor/save.
+        seed.readonly = binary !== null || office
 
         useFolderTabsStore
           .getState()
@@ -2179,7 +2218,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
             return
           }
 
-          // Images and PDFs are bytes, not text: they land on the tab as a
+          // Binary previews are bytes, not text: they land on the tab as a
           // `data:` URL for their renderer, with no etag and no git base.
           if (binary) {
             const dataUrl = await withTimeout(
@@ -3499,7 +3538,8 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
   // budget, drop the least-recently-active buffers (content + git base;
   // metadata/etag survive) and flag them stale — activation refetches
   // through the existing stale machinery. Dirty/loading/saving tabs are
-  // never touched. Converges in one pass: unloaded tabs hold no content,
+  // never touched, nor are tabs displayed by another visible surface.
+  // Converges in one pass: unloaded tabs hold no content,
   // so they stop being candidates.
   useEffect(() => {
     const candidates = fileTabs
@@ -3507,6 +3547,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         (tab) =>
           tab.kind === "file" &&
           tab.id !== activeFileTabId &&
+          !fileContentClaimsRef.current.has(tab.id) &&
           !tab.isDirty &&
           !tab.loading &&
           tab.saveState !== "saving" &&
@@ -3536,7 +3577,12 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         if (!toUnload.has(tab.id) || tab.kind !== "file") return tab
         // Atomic re-check: a keystroke/save enqueued in the same batch
         // must win over the eviction.
-        if (tab.isDirty || tab.loading || tab.saveState === "saving") {
+        if (
+          tab.isDirty ||
+          tab.loading ||
+          tab.saveState === "saving" ||
+          fileContentClaimsRef.current.has(tab.id)
+        ) {
           return tab
         }
         return {
@@ -3548,7 +3594,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
         }
       })
     )
-  }, [fileTabs, activeFileTabId])
+  }, [fileTabs, activeFileTabId, fileContentClaimsRevision])
 
   // Once the active tab is clean and settled (e.g. the user reloaded, or a
   // successful save resolved the divergence), any conflict recorded for
@@ -3619,6 +3665,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       reorderFileTabs,
       openFilePreview,
       reloadOpenFileBackground,
+      retainFileTabContent,
       applyExternalReload,
       markTabsStale,
       rejectFileTab,
@@ -3653,6 +3700,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       reorderFileTabs,
       openFilePreview,
       reloadOpenFileBackground,
+      retainFileTabContent,
       applyExternalReload,
       markTabsStale,
       rejectFileTab,

@@ -5194,6 +5194,184 @@ describe("PDF file tabs", () => {
   })
 })
 
+describe("audio and video file tabs", () => {
+  beforeEach(() => {
+    vi.mocked(api.readFileBase64).mockReset()
+    vi.mocked(api.readFileBase64).mockResolvedValue("bWVkaWE=")
+    mockedApi.readFileForEdit.mockReset()
+    mockedApi.gitIsTracked.mockReset()
+  })
+
+  function MediaProbe({
+    path,
+    onCapture,
+  }: {
+    path: string
+    onCapture: (tabs: FileWorkspaceTab[]) => void
+  }) {
+    const { openFilePreview, fileTabs } = useWorkspaceContext()
+    onCapture(fileTabs)
+    return (
+      <button onClick={() => void openFilePreview(path)}>open-media</button>
+    )
+  }
+
+  function renderMediaProbe(path: string) {
+    let tabs: FileWorkspaceTab[] = []
+    render(
+      <WorkspaceProvider>
+        <MediaProbe path={path} onCapture={(next) => (tabs = next)} />
+      </WorkspaceProvider>
+    )
+    return () => tabs
+  }
+
+  it.each([
+    ["audio/song.mp3", "audio", "audio/mpeg"],
+    ["clips/DEMO.MP4", "video", "video/mp4"],
+  ])("opens %s as read-only bytes, never text", async (path, kind, mime) => {
+    const tabs = renderMediaProbe(path)
+    await act(async () => screen.getByText("open-media").click())
+
+    expect(api.readFileBase64).toHaveBeenCalledWith(
+      `/repo/${path}`,
+      100_000_000
+    )
+    expect(mockedApi.readFileForEdit).not.toHaveBeenCalled()
+    expect(mockedApi.gitIsTracked).not.toHaveBeenCalled()
+    expect(tabs()[0]).toMatchObject({
+      kind: "file",
+      language: kind,
+      content: `data:${mime};base64,bWVkaWE=`,
+      readonly: true,
+      isDirty: false,
+      loading: false,
+      saveState: "idle",
+    })
+  })
+
+  it("reports an oversize media read without falling back to text", async () => {
+    vi.mocked(api.readFileBase64).mockRejectedValueOnce(
+      new Error("File is too large to attach")
+    )
+    const tabs = renderMediaProbe("clips/demo.webm")
+    await act(async () => screen.getByText("open-media").click())
+
+    expect(mockedApi.readFileForEdit).not.toHaveBeenCalled()
+    expect(tabs()[0]).toMatchObject({
+      language: "video",
+      readonly: true,
+      loading: false,
+      saveState: "error",
+      content: 'unableLoadContent:{"message":"File is too large to attach"}',
+    })
+  })
+
+  it.each(["audio/song.mp3", "clips/demo.webm"])(
+    "reloads changed media %s as bytes instead of reconciling it as text",
+    async (path) => {
+      const tabs = renderMediaProbe(path)
+      await act(async () => screen.getByText("open-media").click())
+      vi.mocked(api.readFileBase64).mockResolvedValueOnce("bmV3")
+      await act(async () => workspaceStoreMock.emitRoot("/repo", [path]))
+
+      expect(api.readFileBase64).toHaveBeenCalledTimes(2)
+      expect(api.readFileBase64).toHaveBeenLastCalledWith(
+        `/repo/${path}`,
+        100_000_000
+      )
+      expect(mockedApi.readFileForEdit).not.toHaveBeenCalled()
+      expect(tabs()[0]).toMatchObject({
+        content: expect.stringContaining(";base64,bmV3"),
+        loading: false,
+        readonly: true,
+        saveState: "idle",
+      })
+    }
+  )
+})
+
+describe("visible background file content", () => {
+  const mediaPath = "/repo/clips/large.mp4"
+  const mediaId = fileTabId(mediaPath)
+  // A base64 body just over the hidden-tab budget, still under the media cap.
+  const largeMedia = "A".repeat(48 * 1024 * 1024)
+
+  function ContentClaim() {
+    const { retainFileTabContent } = useWorkspaceContext()
+    useEffect(() => retainFileTabContent(mediaId), [retainFileTabContent])
+    return null
+  }
+
+  function BackgroundMediaProbe({
+    first,
+    second,
+    onCapture,
+  }: {
+    first: boolean
+    second: boolean
+    onCapture: (tabs: FileWorkspaceTab[]) => void
+  }) {
+    const { openFilePreview, fileTabs } = useWorkspaceContext()
+    onCapture(fileTabs)
+    return (
+      <>
+        {first && <ContentClaim key="first" />}
+        {second && <ContentClaim key="second" />}
+        <button onClick={() => void openFilePreview("selected.png")}>
+          select-picture
+        </button>
+        <button
+          onClick={() => void openFilePreview(mediaPath, { background: true })}
+        >
+          background-media
+        </button>
+      </>
+    )
+  }
+
+  it("retains a large canvas preview until its last visible reader leaves", async () => {
+    vi.mocked(api.readFileBase64).mockImplementation(async (path) =>
+      path === mediaPath ? largeMedia : "aW1hZ2U="
+    )
+    let tabs: FileWorkspaceTab[] = []
+    const onCapture = (next: FileWorkspaceTab[]) => {
+      tabs = next
+    }
+    const view = (first: boolean, second: boolean) => (
+      <WorkspaceProvider>
+        <BackgroundMediaProbe
+          first={first}
+          second={second}
+          onCapture={onCapture}
+        />
+      </WorkspaceProvider>
+    )
+    const rendered = render(view(true, true))
+    await act(async () => screen.getByText("select-picture").click())
+    await act(async () => screen.getByText("background-media").click())
+
+    const mediaTab = () => tabs.find((tab) => tab.id === mediaId)
+    expect(mediaTab()?.content.length).toBeGreaterThan(48 * 1024 * 1024)
+    expect(mediaTab()?.stale).toBe(false)
+
+    // Two cards can show the same file; closing one must not evict the other.
+    rendered.rerender(view(false, true))
+    expect(mediaTab()?.content.length).toBeGreaterThan(48 * 1024 * 1024)
+    expect(mediaTab()?.stale).toBe(false)
+
+    // Once no surface displays it, the ordinary hidden-tab budget applies.
+    rendered.rerender(view(false, false))
+    expect(mediaTab()).toMatchObject({ content: "", stale: true })
+
+    // Reopening that reader can reload the evicted tab in the background.
+    rendered.rerender(view(true, false))
+    await act(async () => screen.getByText("background-media").click())
+    expect(mediaTab()?.content.length).toBeGreaterThan(48 * 1024 * 1024)
+    expect(mediaTab()?.stale).toBe(false)
+  })
+})
+
 let scopedWorkspace: ReturnType<typeof useWorkspaceContext>
 function FolderTabsProbe() {
   const workspace = useWorkspaceContext()
