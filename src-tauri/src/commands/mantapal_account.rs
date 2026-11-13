@@ -148,7 +148,7 @@ async fn authed(
         Ok(tokens) => tokens,
         Err(_) => {
             let _ = clear_session();
-            return Err("会话已失效，请重新登录");
+            return Err("会话已失效，请重新登录".into());
         }
     };
     persist_tokens(&new_tokens)?;
@@ -211,12 +211,19 @@ pub async fn mantapal_account_status() -> Result<Value, String> {
     // The membership endpoint is the sole tier authority. No offline/local
     // "Pro" flag or inference from a Sub2API model-credit subscription.
     let profile = authed(&origin, "/user/profile").await?;
-    let membership = authed(&origin, "/mantapal/membership").await?;
-    let tier = membership.get("tier").and_then(Value::as_str);
-    let version = membership.get("schema_version").and_then(Value::as_i64);
-    if version != Some(1) || !matches!(tier, Some("free" | "pro")) {
-        return Err("会员服务返回了不支持的响应，请检查服务端版本".into());
-    }
+    // A deployed account server may temporarily be older than this client.
+    // Keep the verified login visible without fabricating a local Free/Pro
+    // status; membership remains unverified until its endpoint is available.
+    let membership_result = authed(&origin, "/mantapal/membership").await;
+    let (membership, membership_error) = match membership_result {
+        Ok(value) if value.get("schema_version").and_then(Value::as_i64) == Some(1)
+            && matches!(value.get("tier").and_then(Value::as_str), Some("free" | "pro")) =>
+        {
+            (value, None)
+        }
+        Ok(_) => (Value::Null, Some("会员服务返回了不支持的响应".to_string())),
+        Err(err) => (Value::Null, Some(format!("会员状态尚未确认：{err}"))),
+    };
     Ok(json!({
         "authenticated": true,
         "user": {
@@ -224,7 +231,8 @@ pub async fn mantapal_account_status() -> Result<Value, String> {
             "email": profile.get("email"),
             "username": profile.get("username")
         },
-        "membership": membership
+        "membership": membership,
+        "membership_error": membership_error
     }))
 }
 
