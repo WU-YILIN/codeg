@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { AppToaster } from "@/components/ui/app-toaster"
 import { cn } from "@/lib/utils"
+import { isLocalDesktop } from "@/lib/platform"
 import {
   detectEnvironment,
   type TransportEnvironment,
@@ -230,12 +231,20 @@ export function SettingsShell({ children }: SettingsShellProps) {
   )
 
   const filteredNavItems = settingsNavItemsFor(detectEnvironment())
+  const showMantapalCloud = isLocalDesktop()
 
   const navContent = (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="px-2 pb-2 text-2xs font-medium text-muted-foreground">
         {t("preferences")}
       </div>
+      {showMantapalCloud && (
+        <div className="mb-2 px-1">
+          <Button variant={normalizedPathname === "/settings/mantapal-cloud" ? "secondary" : "outline"} size="sm" className="w-full justify-start" onClick={() => navigateTo("/settings/mantapal-cloud")}>
+            Mantapal Cloud
+          </Button>
+        </div>
+      )}
       <ScrollArea className="min-h-0 flex-1">
         <nav className="space-y-1">
           {filteredNavItems.map((item) => {
