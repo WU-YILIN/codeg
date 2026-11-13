@@ -55,6 +55,8 @@ pub mod generative_ui;
 #[cfg(feature = "tauri-runtime")]
 pub mod local_command;
 pub mod logging;
+#[cfg(feature = "tauri-runtime")]
+pub mod mantapal_account;
 pub mod mcp;
 pub mod mcp_service;
 pub mod model_provider;
