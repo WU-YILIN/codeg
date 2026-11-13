@@ -2147,6 +2147,7 @@ mod tauri_app {
                 mantapal_account_commands::mantapal_account_login,
                 mantapal_account_commands::mantapal_account_login_2fa,
                 mantapal_account_commands::mantapal_account_status,
+                mantapal_account_commands::mantapal_account_activate_trial,
                 mantapal_account_commands::mantapal_account_logout,
                 acp_commands::acp_preflight,
                 acp_commands::acp_cursor_auth_status,
