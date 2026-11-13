@@ -45,6 +45,7 @@ The backend authenticates the user, chooses the allowed group/model/endpoint, re
 - This is an initial implementation; full Windows Tauri build, payment-free signup flow and live model/tool-call E2E have **not yet been verified**.
 - Only Claude Code, Codex and Gemini CLI have the one-click managed-trial adapter. OpenCode remains available through its existing native BYOK configuration.
 - The welcome grant uses the existing Sub2API user **wallet** and is not a separate trial-balance ledger. Paid/recharged amounts cannot currently be separated from signup grants in the desktop display.
+- **Account-switch/logout safety is not yet release-ready:** the trial Agent Provider and its user-owned API key may remain configured after signing out. The current branch does not revoke/disconnect those running model credentials. This must be resolved and tested before distribution, especially on shared computers.
 - Existing accounts do not automatically get a new signup gift. A safe one-time backfill/claim system is needed if prior accounts should also receive trial credit.
 - CAPTCHA-enabled password login needs an additional browser/device authorization flow.
 - One trial key is tracked per user per agent. Cross-replica uniqueness relies on the new database partial index, which must be migration-tested before deployment.
