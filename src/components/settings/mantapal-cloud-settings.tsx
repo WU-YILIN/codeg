@@ -22,10 +22,15 @@ interface ImportResult { provider_id: number; key_id: number; name: string }
 const TARGETS = [{ id: "claude_code", label: "Claude Code" }, { id: "codex", label: "Codex" }, { id: "gemini", label: "Gemini CLI" }] as const
 function errorText(error: unknown) { return typeof error === "string" ? error : error instanceof Error ? error.message : "操作失败" }
 function openExternal(url: string) {
-  void import("@tauri-apps/plugin-opener").then(({ openUrl }) => openUrl(url)).catch(e => toast.error(errorText(e)))
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && parsed.hostname === "localhost")) throw new Error("仅支持 HTTPS 链接")
+    void import("@tauri-apps/plugin-opener").then(({ openUrl }) => openUrl(url)).catch(e => toast.error(errorText(e)))
+  } catch (error) { toast.error(errorText(error)) }
 }
 export function MantapalCloudSettings() {
-  const desktop = isLocalDesktop()
+  const [desktop, setDesktop] = useState(false)
+  useEffect(() => setDesktop(isLocalDesktop()), [])
   const [status, setStatus] = useState<Status | null>(null)
   const [baseUrl, setBaseUrl] = useState("")
   const [email, setEmail] = useState("")
