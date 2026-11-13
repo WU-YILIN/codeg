@@ -8,8 +8,15 @@ use std::time::Duration;
 
 use reqwest::{Client, Method, StatusCode, Url};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
+use tauri::{Manager, State};
 
+use crate::acp::manager::ConnectionManager;
+use crate::commands::{acp, model_provider};
+use crate::db::{service::agent_setting_service, AppDatabase};
 use crate::keyring_store;
+use crate::models::agent::AgentType;
+use crate::web::event_bridge::EventEmitter;
 
 const ACCESS_SECRET: &str = "mantapal-account-access";
 const REFRESH_SECRET: &str = "mantapal-account-refresh";
@@ -131,12 +138,14 @@ fn accepted(reply: ApiReply) -> Result<Value, String> {
     }
 }
 
-async fn authed(
+async fn authed_request(
     origin: &str,
+    method: Method,
     path: &str,
+    body: Option<Value>,
 ) -> Result<Value, String> {
     let access = get_secret(ACCESS_SECRET)?.ok_or("请先登录 Mantapal 账户")?;
-    let response = call_api(origin, Method::GET, path, Some(&access), None).await?;
+    let response = call_api(origin, method.clone(), path, Some(&access), body.clone()).await?;
     if response.status != StatusCode::UNAUTHORIZED && response.code != 401 {
         return accepted(response);
     }
@@ -153,7 +162,11 @@ async fn authed(
     };
     persist_tokens(&new_tokens)?;
     let access = get_secret(ACCESS_SECRET)?.ok_or("刷新登录状态失败")?;
-    accepted(call_api(origin, Method::GET, path, Some(&access), None).await?)
+    accepted(call_api(origin, method, path, Some(&access), body).await?)
+}
+
+async fn authed(origin: &str, path: &str) -> Result<Value, String> {
+    authed_request(origin, Method::GET, path, None).await
 }
 
 #[tauri::command]
@@ -247,6 +260,82 @@ pub async fn mantapal_account_logout() -> Result<(), String> {
             Some(json!({"refresh_token": refresh}))).await;
     }
     clear_session()
+}
+
+/// One-click Free trial activation. The gateway URL/model/group and bounded
+/// user key are selected SERVER-SIDE. No admin/shared key enters the installer.
+/// Existing BYOK bindings are left untouched unless the user explicitly
+/// opts to switch in the account UI.
+#[tauri::command]
+pub async fn mantapal_account_activate_trial(
+    agent_type: String,
+    allow_replace: bool,
+    db: State<'_, AppDatabase>,
+    manager: State<'_, ConnectionManager>,
+    app: tauri::AppHandle,
+) -> Result<Value, String> {
+    let _guard = ACCOUNT_LOCK.lock().await;
+    let agent = match agent_type.as_str() {
+        "claude_code" => AgentType::ClaudeCode,
+        "codex" => AgentType::Codex,
+        "gemini" => AgentType::Gemini,
+        _ => return Err("该 Agent 暂未接入 Mantapal Free 自动配置".into()),
+    };
+    let origin = account_origin()?;
+    let membership = authed(&origin, "/mantapal/membership").await?;
+    if membership.get("tier").and_then(Value::as_str) != Some("free") ||
+       membership.get("status").and_then(Value::as_str) != Some("active") {
+        return Err("请先验证有效的 Mantapal Free 会员身份".into());
+    }
+    let current = agent_setting_service::get_by_agent_type(&db.conn, agent)
+        .await.map_err(|_| "无法读取 Agent 配置".to_string())?;
+    if current.as_ref().and_then(|r| r.model_provider_id).is_some() && !allow_replace {
+        return Err("当前 Agent 已绑定一个模型 Provider。请确认是否切换到 Mantapal Free。".into());
+    }
+    let provisioned = authed_request(&origin, Method::POST,
+        "/mantapal/free-connection", Some(json!({"agent_type": agent_type}))).await?;
+    let base = provisioned.get("base_url").and_then(Value::as_str)
+        .ok_or("服务端未返回模型 Base URL")?;
+    let url = Url::parse(base).map_err(|_| "试用服务地址无效")?;
+    if url.scheme() != "https" {
+        return Err("试用模型服务必须使用 HTTPS".into());
+    }
+    let key = provisioned.get("api_key").and_then(Value::as_str)
+        .filter(|v| !v.is_empty()).ok_or("服务端未返回用户专属模型凭据")?;
+    let model = provisioned.get("model").and_then(Value::as_str)
+        .filter(|v| !v.is_empty()).ok_or("服务端未配置试用模型")?;
+    let name = format!("Mantapal Free / {}", agent_type);
+    let model_data = if agent == AgentType::ClaudeCode {
+        Some(json!({"main":model}).to_string())
+    } else { Some(model.to_string()) };
+    let current_providers = model_provider::list_model_providers_core(&db)
+        .await.map_err(|err| format!("读取 Model Provider 失败：{err}"))?;
+    let matching = current_providers.iter().find(|p| p.name == name && p.agent_type == agent_type);
+    let provider_id = match matching {
+        Some(p) if p.api_url == base && p.api_key == key && p.model == model_data => p.id,
+        Some(_) => return Err("Mantapal Free Provider 已存在但内容不同，请在模型设置中检查后重试".into()),
+        None => model_provider::create_model_provider_core(
+            &db, name, base.to_string(), key.to_string(), agent_type.clone(), model_data
+        ).await.map_err(|err| format!("保存试用模型 Provider 失败：{err}"))?.id,
+    };
+    let env: BTreeMap<String, String> = current.as_ref()
+        .and_then(|row| row.env_json.as_deref())
+        .and_then(|raw| serde_json::from_str(raw).ok())
+        .unwrap_or_default();
+    let enabled = current.as_ref().map(|row| row.enabled).unwrap_or(true);
+    let data_dir = app.path().app_data_dir()
+        .map(|p| crate::paths::resolve_effective_data_dir(&p))
+        .map_err(|_| "无法定位应用数据目录".to_string())?;
+    let emitter = EventEmitter::Tauri(app);
+    let affected = acp::acp_update_agent_env_and_refresh(
+        agent, enabled, env, Some(provider_id), &db, &manager, &data_dir, &emitter
+    ).await.map_err(|err| format!("Provider 已保存，但绑定 Agent 失败：{err}"))?;
+    Ok(json!({
+        "agent_type": agent_type,
+        "provider_id": provider_id,
+        "key_id": provisioned.get("key_id"),
+        "affected_running_sessions": affected
+    }))
 }
 
 #[cfg(test)]
