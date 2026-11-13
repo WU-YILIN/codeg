@@ -81,6 +81,11 @@ export function MantapalAccountSettings() {
     try {
       const status = await invoke<AccountStatus>("mantapal_account_status")
       setAccount(status)
+      const available = parseMantapalMembership(status.membership)?.managed_agents ?? []
+      setTrialAgent((current) =>
+        available.includes(current) ? current :
+        (available[0] as "codex" | "claude_code" | "gemini" | undefined) ?? "codex"
+      )
     } catch (cause) {
       // Never keep displaying a stale membership when account verification fails.
       setAccount(null)
@@ -201,6 +206,7 @@ export function MantapalAccountSettings() {
   const signedIn = account?.authenticated === true
   const needsVerification = Boolean(account?.membership_error) || (signedIn && !membership)
   const trialAvailable = membership?.entitlements.managed_trial === true
+  const managedTrialAgents = membership?.managed_agents ?? []
   const trialWalletBalance = account?.user?.balance ?? 0
 
   return (
@@ -364,9 +370,9 @@ export function MantapalAccountSettings() {
                     disabled={busy}
                     onChange={(event) => { setTrialAgent(event.target.value as typeof trialAgent); setTrialResult(null) }}
                   >
-                    <option value="codex">Codex</option>
-                    <option value="claude_code">Claude Code</option>
-                    <option value="gemini">Gemini CLI</option>
+                    {managedTrialAgents.includes("codex") && <option value="codex">Codex</option>}
+                    {managedTrialAgents.includes("claude_code") && <option value="claude_code">Claude Code</option>}
+                    {managedTrialAgents.includes("gemini") && <option value="gemini">Gemini CLI</option>}
                   </select>
                 </div>
                 <label className="flex items-start gap-2 text-xs text-muted-foreground">
