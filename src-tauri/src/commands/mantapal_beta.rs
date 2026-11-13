@@ -23,7 +23,7 @@ static SESSION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 fn normalize_root(raw: &str) -> Result<String, String> {
     let url = Url::parse(raw.trim()).map_err(|_| "请输入有效的 Sub2API 服务地址".to_string())?;
     let host = url.host_str().ok_or("服务地址缺少主机名")?;
-    let local = matches!(host, "localhost" | "127.0.0.1" | "[::1]");
+    let local = matches!(host, "localhost" | "127.0.0.1" | "::1");
     if url.scheme() != "https" && !(url.scheme() == "http" && local) {
         return Err("服务地址必须使用 HTTPS（仅 localhost 可使用 HTTP）".into());
     }
