@@ -121,7 +121,11 @@ fn persist_pair(root: &str, data: &Value) -> Result<(), String> {
         let _ = clear_secret(REFRESH_SECRET);
         return Err(err);
     }
-    save_secret(ROOT_SECRET, root)?;
+    if let Err(error) = save_secret(ROOT_SECRET, root) {
+        let _ = clear_secret(ACCESS_SECRET);
+        let _ = clear_secret(REFRESH_SECRET);
+        return Err(error);
+    }
     Ok(())
 }
 
