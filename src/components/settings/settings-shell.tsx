@@ -231,7 +231,8 @@ export function SettingsShell({ children }: SettingsShellProps) {
   )
 
   const filteredNavItems = settingsNavItemsFor(detectEnvironment())
-  const showMantapalCloud = isLocalDesktop()
+  const [showMantapalCloud, setShowMantapalCloud] = useState(false)
+  useEffect(() => setShowMantapalCloud(isLocalDesktop()), [])
 
   const navContent = (
     <div className="flex min-h-0 flex-1 flex-col">
