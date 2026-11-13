@@ -179,10 +179,10 @@ pub async fn mantapal_account_login(email: String, password: String) -> Result<V
     let data = accepted(call_api(&origin, Method::POST, "/auth/login", None,
         Some(json!({"email": email.trim(), "password": password}))).await?)?;
     if data.get("requires_2fa").and_then(Value::as_bool) == Some(true) {
-        return Ok(json!({
-            "requires_2fa": true,
-            "temp_token": data.get("temp_token").and_then(Value::as_str).unwrap_or("")
-        }));
+        let temp = data.get("temp_token").and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or("两步验证响应缺少临时令牌")?;
+        return Ok(json!({"requires_2fa": true, "temp_token": temp}));
     }
     persist_tokens(&data)?;
     Ok(json!({"requires_2fa": false}))
