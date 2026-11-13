@@ -9,6 +9,7 @@ export interface MantapalMembership {
   entitlements: Record<string, boolean>
   subscription: unknown | null
   upgrade_available: boolean
+  managed_agents?: string[]
 }
 
 export function parseMantapalMembership(
@@ -20,6 +21,9 @@ export function parseMantapalMembership(
   if (value.tier !== "free" && value.tier !== "pro") return null
   if (!["active", "inactive", "expired"].includes(String(value.status))) return null
   if (typeof value.upgrade_available !== "boolean") return null
+  if (value.managed_agents !== undefined &&
+    (!Array.isArray(value.managed_agents) ||
+      !value.managed_agents.every((v: unknown) => typeof v === "string"))) return null
   const entitlements = value.entitlements
   if (!entitlements || typeof entitlements !== "object" || Array.isArray(entitlements)) return null
   if (!Object.values(entitlements).every((entry) => typeof entry === "boolean")) return null
