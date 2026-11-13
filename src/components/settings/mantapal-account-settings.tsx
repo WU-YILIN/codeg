@@ -57,7 +57,7 @@ async function openAccountUrl(value?: string): Promise<void> {
 
 export function MantapalAccountSettings() {
   const router = useRouter()
-  const [desktop, setDesktop] = useState(false)
+  const [desktop, setDesktop] = useState<boolean | null>(null)
   const [config, setConfig] = useState<AccountConfig | null>(null)
   const [account, setAccount] = useState<AccountStatus | null>(null)
   const [loading, setLoading] = useState(true)
@@ -69,8 +69,14 @@ export function MantapalAccountSettings() {
   const [totp, setTotp] = useState("")
 
   const refresh = useCallback(async () => {
-    const status = await invoke<AccountStatus>("mantapal_account_status")
-    setAccount(status)
+    try {
+      const status = await invoke<AccountStatus>("mantapal_account_status")
+      setAccount(status)
+    } catch (cause) {
+      // Never keep displaying a stale membership when account verification fails.
+      setAccount(null)
+      throw cause
+    }
   }, [])
 
   useEffect(() => {
@@ -78,10 +84,12 @@ export function MantapalAccountSettings() {
   }, [])
 
   useEffect(() => {
+    if (desktop === null) return
     if (!desktop) {
       setLoading(false)
       return
     }
+    setLoading(true)
     let cancelled = false
     const load = async () => {
       try {
