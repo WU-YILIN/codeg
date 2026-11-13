@@ -200,6 +200,8 @@ export function MantapalAccountSettings() {
     parseMantapalMembership(account?.membership)
   const signedIn = account?.authenticated === true
   const needsVerification = Boolean(account?.membership_error) || (signedIn && !membership)
+  const trialAvailable = membership?.entitlements.managed_trial === true
+  const trialWalletBalance = account?.user?.balance ?? 0
 
   return (
     <div className="h-full overflow-y-auto">
@@ -372,7 +374,13 @@ export function MantapalAccountSettings() {
                     onChange={(event) => setAllowReplace(event.target.checked)} />
                   如果此 Agent 已经绑定其他模型服务，确认切换到 Mantapal Free。原有 Provider 不会被删除。
                 </label>
-                <Button onClick={() => void activateTrial()} disabled={busy}>
+                {!trialAvailable && (
+                  <p className="text-sm text-muted-foreground">当前试用模型尚未由服务端启用，请检查 Free 模型配置。</p>
+                )}
+                {trialWalletBalance <= 0 && trialAvailable && (
+                  <p className="text-sm text-muted-foreground">当前账户可用余额为 0，尚不能消耗免费试用额度。赠额需要由服务端在注册时发放。</p>
+                )}
+                <Button onClick={() => void activateTrial()} disabled={busy || !trialAvailable || trialWalletBalance <= 0}>
                   一键启用免费试用
                 </Button>
                 {trialResult && (
