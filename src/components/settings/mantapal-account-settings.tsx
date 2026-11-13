@@ -27,7 +27,7 @@ type AccountConfig = {
 
 type AccountStatus = {
   authenticated: boolean
-  user?: { id?: number; username?: string; email?: string }
+  user?: { id?: number; username?: string; email?: string; balance?: number }
   membership?: unknown
   membership_error?: string
 }
@@ -35,6 +35,12 @@ type AccountStatus = {
 type LoginResult = {
   requires_2fa: boolean
   temp_token?: string
+}
+
+type TrialActivationResult = {
+  agent_type: string
+  provider_id: number
+  affected_running_sessions: number
 }
 
 function describeError(value: unknown): string {
@@ -67,6 +73,9 @@ export function MantapalAccountSettings() {
   const [password, setPassword] = useState("")
   const [tempToken, setTempToken] = useState("")
   const [totp, setTotp] = useState("")
+  const [trialAgent, setTrialAgent] = useState<"codex" | "claude_code" | "gemini">("codex")
+  const [allowReplace, setAllowReplace] = useState(false)
+  const [trialResult, setTrialResult] = useState<TrialActivationResult | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -172,6 +181,21 @@ export function MantapalAccountSettings() {
     })
   }
 
+  async function activateTrial() {
+    const result = await action(async () => {
+      return invoke<TrialActivationResult>("mantapal_account_activate_trial", {
+        agentType: trialAgent,
+        allowReplace,
+      })
+    })
+    if (!result) return
+    setTrialResult(result)
+    toast.success("Mantapal 免费试用已连接到所选 Agent")
+    if (result.affected_running_sessions > 0) {
+      toast.info("已有会话需要重启后才能使用新配置")
+    }
+  }
+
   const membership: MantapalMembership | null =
     parseMantapalMembership(account?.membership)
   const signedIn = account?.authenticated === true
@@ -186,7 +210,7 @@ export function MantapalAccountSettings() {
             Mantapal 账户
           </h1>
           <p className="text-sm text-muted-foreground">
-            Mantapal 目前只提供 Free 软件会员。模型由你自己选择服务商，使用自己的 API Key 和 Base URL。
+            Mantapal Free 内置模型连接服务，注册后可使用赠送的试用额度；你也可以随时选择自己的 API Key 和 Base URL。
           </p>
         </header>
 
@@ -230,10 +254,11 @@ export function MantapalAccountSettings() {
                     <div className="rounded-md bg-muted/50 p-4">
                       <p className="font-semibold">Mantapal Free</p>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        已激活。现有 Agent、本地项目及自带模型服务继续开放使用。
+                        已激活。默认提供 Mantapal 模型试用服务；BYOK 可以继续使用。
                       </p>
                     </div>
                   )}
+                  <p className="text-sm text-muted-foreground">模型账户可用余额：<span className="font-semibold tabular-nums">{typeof account.user?.balance === "number" ? account.user.balance.toFixed(4) : "—"} USD</span>。新用户赠额来自服务端注册赠送设置，账户余额可能同时包含其他充值资金。</p>
                   {needsVerification && (
                     <p className="rounded-md border border-amber-500/30 p-3 text-sm text-muted-foreground">
                       {account.membership_error ??
@@ -318,16 +343,56 @@ export function MantapalAccountSettings() {
               )}
             </section>
 
+            {signedIn && membership?.tier === "free" && membership.status === "active" && (
+              <section className="space-y-3 rounded-lg border p-5">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-semibold">Mantapal 免费模型试用</h2>
+                  <Badge variant="secondary">内置服务</Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  不必填写 API Key / Base URL。选择 Agent 后，Mantapal 会从服务端领取当前账户专属的有限额凭据并完成配置。
+                  试用消费由模型服务账本扣除，不会使用公共共享密钥。
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="mantapal-trial-agent">试用 Agent</Label>
+                  <select
+                    id="mantapal-trial-agent"
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                    value={trialAgent}
+                    disabled={busy}
+                    onChange={(event) => { setTrialAgent(event.target.value as typeof trialAgent); setTrialResult(null) }}
+                  >
+                    <option value="codex">Codex</option>
+                    <option value="claude_code">Claude Code</option>
+                    <option value="gemini">Gemini CLI</option>
+                  </select>
+                </div>
+                <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                  <input type="checkbox" className="mt-0.5" checked={allowReplace}
+                    onChange={(event) => setAllowReplace(event.target.checked)} />
+                  如果此 Agent 已经绑定其他模型服务，确认切换到 Mantapal Free。原有 Provider 不会被删除。
+                </label>
+                <Button onClick={() => void activateTrial()} disabled={busy}>
+                  一键启用免费试用
+                </Button>
+                {trialResult && (
+                  <p className="text-xs text-muted-foreground">
+                    已连接 {trialResult.agent_type}。本次使用的是当前账户的专属试用凭据，不会在界面展示密钥。
+                  </p>
+                )}
+              </section>
+            )}
+
             <section className="space-y-3 rounded-lg border p-5">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold">模型配置</h2>
-                <Badge variant="outline">BYOK</Badge>
+                <h2 className="font-semibold">使用自己的模型服务</h2>
+                <Badge variant="outline">BYOK · 可选</Badge>
               </div>
               <p className="text-sm text-muted-foreground">
-                会员身份与模型计费相互独立。你仍可在 Agent 设置中配置任何已支持的 API Key、Base URL 和模型。
+                如需接入自己的提供商，可以继续手动填写 API Key、Base URL 和模型；与赠送试用额度相互独立。
               </p>
               <Button variant="outline" onClick={() => router.push("/settings/model-providers")}>
-                打开 Model Providers
+                配置自己的 Model Provider
               </Button>
             </section>
 
