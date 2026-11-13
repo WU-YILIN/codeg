@@ -242,7 +242,8 @@ pub async fn mantapal_account_status() -> Result<Value, String> {
         "user": {
             "id": profile.get("id"),
             "email": profile.get("email"),
-            "username": profile.get("username")
+            "username": profile.get("username"),
+            "balance": profile.get("balance")
         },
         "membership": membership,
         "membership_error": membership_error
