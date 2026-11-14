@@ -71,7 +71,7 @@ import { useFeedbackEnabled } from "@/hooks/use-feedback-enabled"
 import { useSessionFeedback } from "@/hooks/use-session-feedback"
 import { AgentSelector } from "@/components/chat/agent-selector"
 import { ChatInput } from "@/components/chat/chat-input"
-import { WelcomeHero, WelcomeTip } from "@/components/chat/welcome-hero"
+import { MantapalWelcome } from "@/features/mantapal/workspace-home"
 import { QuickActions } from "@/components/chat/quick-actions"
 import type { ComposerInjectContent } from "@/components/chat/message-input"
 import { TileScrollContainer } from "@/components/conversations/tile-scroll-container"
@@ -2403,97 +2403,92 @@ const ConversationTabView = memo(function ConversationTabView({
           x="hidden"
           y="scroll"
         >
-          <div className="flex min-h-full flex-col">
-            <div className="flex-1" />
-            <div className="mx-auto flex w-full chat-content-w shrink-0 flex-col gap-6 px-4 py-4">
-              <WelcomeHero />
+          <MantapalWelcome onSuggest={(text) => handleQuickAction({ text })}>
+            <div className="flex justify-center">
+              <AgentSelector
+                // The selector spans the row it is given (it has to measure
+                // how much room it has), so the centring lives inside it now
+                // — the `justify-center` above only centres a full-width box.
+                align="center"
+                defaultAgentType={selectedAgent}
+                onSelect={handleAgentSelect}
+                onFallback={handleAgentFallback}
+                onAgentsLoaded={(agents) => {
+                  setAgentsLoaded(true)
+                  setUsableAgentCount(
+                    agents.filter((agent) => agent.enabled && agent.available)
+                      .length
+                  )
+                }}
+                onOpenAgentsSettings={handleOpenAgentsSettings}
+                // Drafts remain switchable while connecting; saved
+                // conversations retain the agent they were created with.
+                disabled={dbConversationId != null}
+              />
+            </div>
+            {composerBlockedMessage ? (
+              <div className="flex w-full items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                <button
+                  type="button"
+                  onClick={handleOpenAgentsSettings}
+                  title={composerBlockedMessage}
+                  className="min-w-0 flex-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-left transition-colors hover:text-destructive/80"
+                >
+                  {composerBlockedMessage}
+                </button>
+                {selectedAgentNotInstalled ? (
+                  <button
+                    type="button"
+                    onClick={() => setComposerDiagnosticsOpen(true)}
+                    className="shrink-0 rounded border border-destructive/40 px-2 py-0.5 font-medium transition-colors hover:bg-destructive/10"
+                  >
+                    {tDiag("button")}
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+            <ChatInput
+              // composerConnStatus (not connStatus): a chat draft mid-reconnect
+              // reads "connecting" until the connection's cwd matches, so the
+              // send affordance stays disabled until handleSend would accept it.
+              status={composerConnStatus}
+              promptCapabilities={conn.promptCapabilities}
+              defaultPath={workingDirForConnection}
+              agentName={getAgentLabel(selectedAgent)}
+              onFocus={handleFocus}
+              onSend={handleSend}
+              onCancel={handleCancel}
+              modes={connectionModes}
+              configOptions={connectionConfigOptions}
+              modeLoading={modeLoading}
+              configOptionsLoading={configOptionsLoading}
+              selectorsLoading={selectorsLoading}
+              selectedModeId={selectedModeId}
+              onModeChange={handleModeChange}
+              onConfigOptionChange={handleSetConfigOption}
+              agentType={selectedAgent}
+              availableCommands={connectionCommands}
+              attachmentTabId={tabId}
+              draftStorageKey={draftStorageKey}
+              isActive={isActive}
+              showActiveFlow={showActiveFlow}
+              onAddFeedback={
+                feedback.featureEnabled ? feedback.openDialog : undefined
+              }
+              feedbackAddDisabled={!feedback.canSubmit}
+              injectContent={composerInject}
+              onInjectConsumed={handleComposerInjectConsumed}
+              flush
+              tall
+            />
+            <details className="mp-extra-tools">
+              <summary>技能与模板</summary>
               <QuickActions
                 onSelect={handleQuickAction}
                 agentType={selectedAgent}
               />
-              <div className="flex justify-center">
-                <AgentSelector
-                  // The selector spans the row it is given (it has to measure
-                  // how much room it has), so the centring lives inside it now
-                  // — the `justify-center` above only centres a full-width box.
-                  align="center"
-                  defaultAgentType={selectedAgent}
-                  onSelect={handleAgentSelect}
-                  onFallback={handleAgentFallback}
-                  onAgentsLoaded={(agents) => {
-                    setAgentsLoaded(true)
-                    setUsableAgentCount(
-                      agents.filter((agent) => agent.enabled && agent.available)
-                        .length
-                    )
-                  }}
-                  onOpenAgentsSettings={handleOpenAgentsSettings}
-                  // Drafts remain switchable while connecting; saved
-                  // conversations retain the agent they were created with.
-                  disabled={dbConversationId != null}
-                />
-              </div>
-              {composerBlockedMessage ? (
-                <div className="flex w-full items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                  <button
-                    type="button"
-                    onClick={handleOpenAgentsSettings}
-                    title={composerBlockedMessage}
-                    className="min-w-0 flex-1 cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap text-left transition-colors hover:text-destructive/80"
-                  >
-                    {composerBlockedMessage}
-                  </button>
-                  {selectedAgentNotInstalled ? (
-                    <button
-                      type="button"
-                      onClick={() => setComposerDiagnosticsOpen(true)}
-                      className="shrink-0 rounded border border-destructive/40 px-2 py-0.5 font-medium transition-colors hover:bg-destructive/10"
-                    >
-                      {tDiag("button")}
-                    </button>
-                  ) : null}
-                </div>
-              ) : null}
-              <ChatInput
-                // composerConnStatus (not connStatus): a chat draft mid-reconnect
-                // reads "connecting" until the connection's cwd matches, so the
-                // send affordance stays disabled until handleSend would accept it.
-                status={composerConnStatus}
-                promptCapabilities={conn.promptCapabilities}
-                defaultPath={workingDirForConnection}
-                agentName={getAgentLabel(selectedAgent)}
-                onFocus={handleFocus}
-                onSend={handleSend}
-                onCancel={handleCancel}
-                modes={connectionModes}
-                configOptions={connectionConfigOptions}
-                modeLoading={modeLoading}
-                configOptionsLoading={configOptionsLoading}
-                selectorsLoading={selectorsLoading}
-                selectedModeId={selectedModeId}
-                onModeChange={handleModeChange}
-                onConfigOptionChange={handleSetConfigOption}
-                agentType={selectedAgent}
-                availableCommands={connectionCommands}
-                attachmentTabId={tabId}
-                draftStorageKey={draftStorageKey}
-                isActive={isActive}
-                showActiveFlow={showActiveFlow}
-                onAddFeedback={
-                  feedback.featureEnabled ? feedback.openDialog : undefined
-                }
-                feedbackAddDisabled={!feedback.canSubmit}
-                injectContent={composerInject}
-                onInjectConsumed={handleComposerInjectConsumed}
-                flush
-                tall
-              />
-            </div>
-            <div className="flex-1" />
-            <div className="mx-auto w-full chat-content-w shrink-0 px-4 pb-6">
-              <WelcomeTip />
-            </div>
-          </div>
+            </details>
+          </MantapalWelcome>
         </ScrollArea>
       ) : showDraftHeader ? (
         <div className="flex h-full min-h-0 flex-col">
@@ -2964,7 +2959,11 @@ export function ConversationDetailPanel() {
   }, [tabs])
 
   if (hasNoTabs) {
-    return tabsFollowFolder ? <FolderTabsEmptyState /> : null
+    return (
+      <ScrollArea className="h-full min-h-0" x="hidden" y="scroll">
+        <MantapalWelcome />
+      </ScrollArea>
+    )
   }
 
   const renderTabWrapper = (

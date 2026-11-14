@@ -714,3 +714,13 @@ describe("Sidebar — Section order control", () => {
     expect(spies.listProps?.showRecent).toBe(false)
   })
 })
+
+describe("Mantapal account entry", () => {
+  it("has one account entry that opens the integrated account route", () => {
+    renderSidebar()
+    const entries = screen.getAllByRole("button", { name: "用户中心与设置" })
+    expect(entries).toHaveLength(1)
+    fireEvent.click(entries[0])
+    expect(spies.setRoute).toHaveBeenCalledWith("account")
+  })
+})

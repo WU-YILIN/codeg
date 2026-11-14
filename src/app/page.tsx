@@ -2,6 +2,8 @@
 
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useMantapalAccount } from "@/features/mantapal/account-provider"
+import { BrandSplash } from "@/features/mantapal/brand"
 import { isDesktop } from "@/lib/platform"
 import {
   codegAuthHeaders,
@@ -11,7 +13,13 @@ import {
 
 export default function Page() {
   const router = useRouter()
+  const { account, loading } = useMantapalAccount()
   useEffect(() => {
+    if (loading) return
+    if (!account || account.firstUse) {
+      router.replace("/login")
+      return
+    }
     if (isDesktop()) {
       router.replace("/workspace")
       return
@@ -23,7 +31,9 @@ export default function Page() {
       // (CODEG_AUTH=proxy-jwt); an unreachable server leaves that to the
       // in-app connection dialog, as with a token.
       void probeProxyAuthentication().then((result) => {
-        router.replace(result === "unauthorized" ? "/login" : "/workspace")
+        router.replace(
+          result === "unauthorized" ? "/server-login" : "/workspace"
+        )
       })
       return
     }
@@ -47,7 +57,7 @@ export default function Page() {
         ) {
           // Token genuinely rejected → clear it and re-authenticate.
           localStorage.removeItem("codeg_token")
-          router.replace("/login")
+          router.replace("/server-login")
           return
         }
         // Server reachable but unhealthy (5xx / proxy error), or a proxy in
@@ -62,6 +72,6 @@ export default function Page() {
         // and let WebConnectionGuard surface the offline state and recover.
         router.replace("/workspace")
       })
-  }, [router])
-  return null
+  }, [router, account, loading])
+  return <BrandSplash />
 }

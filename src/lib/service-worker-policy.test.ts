@@ -25,7 +25,13 @@ const ROOT_PAGE_SOURCE = readFileSync(
 )
 
 const ORIGIN = "https://codeg.example"
-const BOOT_DOCUMENTS = ["/index.html", "/workspace", "/login"]
+const BOOT_DOCUMENTS = [
+  "/index.html",
+  "/workspace",
+  "/login",
+  "/server-login",
+  "/policies",
+]
 
 interface FakeRequest {
   method: string

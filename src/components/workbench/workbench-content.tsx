@@ -1,5 +1,9 @@
 "use client"
 
+import {
+  MantapalAccountPage,
+  MantapalAccountTitle,
+} from "@/features/mantapal/account-page"
 import type { ComponentType } from "react"
 import {
   useWorkbenchRoute,
@@ -32,6 +36,7 @@ const WORKBENCH_ROUTES: Partial<Record<WorkbenchRouteId, ComponentType>> = {
   forge: ForgePage,
   tokenUsage: TokenUsagePage,
   canvas: CanvasPage,
+  account: MantapalAccountPage,
 }
 
 /** Optional per-route content for the window-chrome strip above the page
@@ -43,6 +48,7 @@ const WORKBENCH_ROUTE_STRIPS: Partial<Record<WorkbenchRouteId, ComponentType>> =
     forge: ForgePageTitle,
     tokenUsage: TokenUsagePageTitle,
     canvas: CanvasPageTitle,
+    account: MantapalAccountTitle,
   }
 
 /** What a chrome cluster hands its route's buttons: the host's own button

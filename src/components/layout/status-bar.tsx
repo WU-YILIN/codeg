@@ -8,6 +8,7 @@ import { StatusBarComputer } from "@/components/layout/status-bar-computer"
 import { StatusBarUpdate } from "@/components/layout/status-bar-update"
 import { CommandDropdown } from "@/components/layout/command-dropdown"
 import { QuickActionsDropdown } from "@/components/layout/quick-actions-dropdown"
+import { MantapalUsageButton } from "@/features/mantapal/account-page"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 export function StatusBar() {
@@ -21,7 +22,6 @@ export function StatusBar() {
     return (
       <div className="h-8 shrink-0 border-t border-border ws-chrome-border ws-surface-muted px-3 flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-3">
-          <QuickActionsDropdown />
           <StatusBarStats />
         </div>
         <div className="flex items-center gap-3">
@@ -29,6 +29,10 @@ export function StatusBar() {
           <CommandDropdown />
           <StatusBarMcp />
           <StatusBarAlerts />
+          <div className="mp-quick-dock">
+            <QuickActionsDropdown />
+            <MantapalUsageButton />
+          </div>
         </div>
       </div>
     )
@@ -56,7 +60,6 @@ export function StatusBar() {
           against the built stylesheet, both icons then occupy exactly 13–27px.
           Everything is rem-sized, so they stay locked under app zoom. */}
       <div className="flex items-center gap-3">
-        <QuickActionsDropdown />
         <StatusBarStats />
       </div>
       <div className="flex items-center gap-4">
@@ -73,6 +76,10 @@ export function StatusBar() {
             and both open a top-anchored popover from this corner. */}
         <StatusBarMcp />
         <StatusBarAlerts />
+        <div className="mp-quick-dock">
+          <QuickActionsDropdown />
+          <MantapalUsageButton />
+        </div>
       </div>
     </div>
   )

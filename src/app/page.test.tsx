@@ -1,6 +1,16 @@
 import { render, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+const accountState = vi.hoisted(() => ({
+  account: { id: "test", firstUse: false } as {
+    id: string
+    firstUse: boolean
+  } | null,
+  loading: false,
+}))
+vi.mock("@/features/mantapal/account-provider", () => ({
+  useMantapalAccount: () => accountState,
+}))
 const router = vi.hoisted(() => ({ replace: vi.fn() }))
 vi.mock("next/navigation", () => ({ useRouter: () => router }))
 vi.mock("@/lib/platform", () => ({ isDesktop: () => false }))
@@ -16,6 +26,8 @@ const reply = (status: number, challenge?: string) => ({
 let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
+  accountState.account = { id: "test", firstUse: false }
+  accountState.loading = false
   router.replace.mockClear()
   localStorage.setItem("codeg_token", "tok")
   fetchMock = vi.fn()
@@ -38,10 +50,12 @@ describe("root page token check", () => {
     })
   })
 
-  it("clears the token and goes to /login when Codeg rejects it", async () => {
+  it("clears the token and goes to /server-login when Codeg rejects it", async () => {
     fetchMock.mockResolvedValue(reply(401, 'Bearer realm="codeg"'))
     render(<Page />)
-    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/login"))
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith("/server-login")
+    )
     expect(localStorage.getItem("codeg_token")).toBeNull()
   })
 
@@ -73,6 +87,23 @@ describe("root page without a token", () => {
   it("asks for the token when the server wants one", async () => {
     fetchMock.mockResolvedValue(reply(401, 'Bearer realm="codeg"'))
     render(<Page />)
+    await waitFor(() =>
+      expect(router.replace).toHaveBeenCalledWith("/server-login")
+    )
+  })
+})
+
+describe("Mantapal account gate before the Codeg connection", () => {
+  it("does not contact the workspace before account authentication", async () => {
+    accountState.account = null
+    render(<Page />)
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/login"))
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+  it("requires first-use naming before connecting the workspace", async () => {
+    accountState.account = { id: "test", firstUse: true }
+    render(<Page />)
+    await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/login"))
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 })

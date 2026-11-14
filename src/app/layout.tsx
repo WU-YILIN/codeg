@@ -1,10 +1,14 @@
 import type { Metadata, Viewport } from "next"
 import "katex/dist/katex.min.css"
 import "./globals.css"
+import "@/features/mantapal/mantapal.css"
+import {
+  MantapalAccountProvider,
+  MantapalConnectionChrome,
+} from "@/features/mantapal/account-provider"
 import { NextIntlClientProvider } from "next-intl"
 import { AppI18nProvider } from "@/components/i18n-provider"
 import { getMessagesForLocale } from "@/i18n/messages"
-import { resolveRequestLocale } from "@/i18n/resolve-request-locale"
 import { ThemeProvider } from "@/components/theme-provider"
 import { toIntlLocale } from "@/lib/i18n"
 import { APPEARANCE_INIT_SCRIPT } from "@/lib/appearance-script"
@@ -37,19 +41,13 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "codeg",
-  description: "AI Coding Agent Conversation Manager",
+  title: "Mantapal",
+  description: "项目、会话和文件，都留在手边。",
   icons: {
-    icon: [
-      { url: "/icon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
-      { url: "/icon.svg", type: "image/svg+xml" },
-    ],
+    shortcut: "/mantapal/favicon.png",
+    icon: [{ url: "/mantapal/favicon.png", type: "image/png" }],
     apple: [
-      { url: "/icon-128x128.png", sizes: "128x128", type: "image/png" },
-      { url: "/icon-192x192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icon-512x512.png", sizes: "512x512", type: "image/png" },
+      { url: "/mantapal/app-192.png", sizes: "192x192", type: "image/png" },
     ],
   },
 }
@@ -59,12 +57,12 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const appLocale = await resolveRequestLocale()
+  const appLocale = "zh_cn" as const
   const initialLocale = toIntlLocale(appLocale)
   const initialMessages = await getMessagesForLocale(appLocale)
 
   return (
-    <html lang={initialLocale} suppressHydrationWarning>
+    <html data-brand="mantapal" lang={initialLocale} suppressHydrationWarning>
       <head>
         {/* Written by hand rather than via `metadata.manifest`: Next only adds
             `crossOrigin="use-credentials"` there on Vercel preview builds.
@@ -81,7 +79,7 @@ export default async function RootLayout({
         {/* CSS-only dark background: applies before JS executes, preventing white flash in dark mode */}
         <style
           dangerouslySetInnerHTML={{
-            __html: `@media(prefers-color-scheme:dark){html:not(.light){background-color:#09090b;color-scheme:dark}}`,
+            __html: `@media(prefers-color-scheme:dark){html.dark{background-color:#09090b;color-scheme:dark}}`,
           }}
         />
         {/* Apply appearance preferences (theme color + zoom + dark class) before first paint to prevent FOUC */}
@@ -92,31 +90,35 @@ export default async function RootLayout({
           locale={initialLocale}
           messages={initialMessages}
         >
-          <AppI18nProvider
-            initialLocale={initialLocale}
-            initialMessages={initialMessages}
-          >
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
+          <MantapalAccountProvider>
+            <AppI18nProvider
+              initialLocale={initialLocale}
+              initialMessages={initialMessages}
             >
-              <AppearanceProvider>
-                <OverlayScrollbarsInit />
-                <ClipboardFallbackInit />
-                <ServiceWorkerInit />
-                <WebConnectionGuard />
-                <WebVersionNotice />
-                <WindowResizeGrips />
-                {/* Self-gated to the main window: every route it can show
+              <ThemeProvider
+                attribute="class"
+                defaultTheme="light"
+                enableSystem
+                disableTransitionOnChange
+              >
+                <AppearanceProvider>
+                  <OverlayScrollbarsInit />
+                  <ClipboardFallbackInit />
+                  <ServiceWorkerInit />
+                  <MantapalConnectionChrome>
+                    <WebConnectionGuard />
+                    <WebVersionNotice />
+                  </MantapalConnectionChrome>
+                  <WindowResizeGrips />
+                  {/* Self-gated to the main window: every route it can show
                     (/workspace, /login, the redirecting /) must be able to
                     answer a close press. */}
-                <CloseRequestDialog />
-                {children}
-              </AppearanceProvider>
-            </ThemeProvider>
-          </AppI18nProvider>
+                  <CloseRequestDialog />
+                  {children}
+                </AppearanceProvider>
+              </ThemeProvider>
+            </AppI18nProvider>
+          </MantapalAccountProvider>
         </NextIntlClientProvider>
       </body>
     </html>

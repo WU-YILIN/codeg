@@ -154,7 +154,7 @@ const SCRIPT = `
     // next-themes 使用 localStorage key "theme"，attribute="class"。
     var storedMode = localStorage.getItem("theme");
     var isDark = storedMode === "dark" ||
-        (storedMode !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        (storedMode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
     if (isDark) {
       document.documentElement.classList.add("dark");
       document.documentElement.style.colorScheme = "dark";

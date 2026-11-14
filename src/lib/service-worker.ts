@@ -28,6 +28,7 @@ export const CACHEABLE_PREFIXES = [
   "/_next/static/",
   "/vs/",
   "/icon",
+  "/mantapal/",
   "/manifest.json",
 ]
 

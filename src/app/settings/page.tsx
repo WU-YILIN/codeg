@@ -7,7 +7,7 @@ export default function SettingsPage() {
   const router = useRouter()
 
   useEffect(() => {
-    router.replace("/settings/appearance")
+    router.replace(`/settings/appearance${window.location.search}`)
   }, [router])
 
   return null

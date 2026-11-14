@@ -58,13 +58,10 @@ describe("ConversationDetailPanel new conversation layout", () => {
 
     const welcomeBranch = source.slice(welcomeBranchStart, nextBranchStart)
     expect(welcomeBranch).toContain("<ChatInput")
-    // The welcome page scrolls with the app's shared overlay scrollbar (the
-    // sidebar's os-theme-codeg bar), not the platform's native one. `min-h-full`
-    // on the inner column preserves the spacer layout the old
-    // `overflow-y-auto` flex column had.
+    // The actual composer stays inside the scrollable Mantapal home; its
+    // runtime, injection handler, folder picker and sizing contract survive.
     expect(welcomeBranch).toContain("<ScrollArea")
-    expect(welcomeBranch).toContain('className="flex min-h-full flex-col"')
-    expect(welcomeBranch).not.toContain("overflow-y-auto")
+    expect(welcomeBranch).toContain("<MantapalWelcome onSuggest=")
     expect(welcomeBranch).not.toContain("WelcomeBackdrop")
     // The welcome input is flushed: the welcome column already supplies px-4, so
     // the input must not double-pad (would make it narrower than the cards).
@@ -297,7 +294,7 @@ describe("ConversationDetailPanel new conversation layout", () => {
     expect(chatInputSource).not.toContain("containerClassName")
     expect(source).not.toContain("containerClassName")
     expect(conversationShellSource).not.toContain("containerClassName")
-    expect(source).toContain("mx-auto flex w-full chat-content-w")
+    expect(source).toContain("<MantapalWelcome onSuggest=")
   })
 })
 
@@ -334,8 +331,8 @@ describe("ConversationDetailPanel split-group render model", () => {
   // so and offers a first conversation, whether or not other folders have
   // tabs, and the workspace keeps the strip (and its "+") up for it.
   it("shows the empty-folder state instead of a blank column", () => {
-    expect(source).toContain(
-      "return tabsFollowFolder ? <FolderTabsEmptyState /> : null"
+    expect(source).toMatch(
+      /if \(hasNoTabs\) \{[\s\S]*?<ScrollArea[\s\S]*?<MantapalWelcome \/>/
     )
     expect(source).toContain(
       "{tabsFollowFolder && visibleTabs.length === 0 && ("

@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { SystemLanguageSettings } from "@/lib/types"
 
+vi.mock("next/navigation", () => ({ usePathname: () => "/workspace" }))
+
 const api = vi.hoisted(() => ({
   getSystemLanguageSettings: vi.fn<() => Promise<SystemLanguageSettings>>(),
 }))

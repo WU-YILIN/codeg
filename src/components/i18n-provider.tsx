@@ -9,6 +9,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
+import { usePathname } from "next/navigation"
 import { NextIntlClientProvider, type AbstractIntlMessages } from "next-intl"
 import { Direction } from "radix-ui"
 import { getFallbackMessages, getMessagesForLocale } from "@/i18n/messages"
@@ -98,6 +99,10 @@ export function AppI18nProvider({
   initialLocale = "en",
   initialMessages,
 }: AppI18nProviderProps) {
+  const pathname = usePathname()
+  const publicRoute = ["/", "/login", "/server-login", "/policies"].includes(
+    pathname
+  )
   const initialAppLocale = fromIntlLocale(initialLocale)
   const [languageSettings, setLanguageSettingsState] =
     useState<SystemLanguageSettings>({
@@ -183,10 +188,18 @@ export function AppI18nProvider({
   useEffect(() => {
     let cancelled = false
 
+    if (publicRoute) {
+      setLanguageSettingsLoaded(true)
+      return
+    }
     getSystemLanguageSettings()
       .then((settings) => {
         if (cancelled) return
-        setLanguageSettings(settings)
+        setLanguageSettings(
+          settings.mode === "system"
+            ? { mode: "manual", language: "zh_cn" }
+            : settings
+        )
       })
       .catch((err) => {
         console.error("[i18n] load language settings failed:", err)
@@ -200,7 +213,7 @@ export function AppI18nProvider({
     return () => {
       cancelled = true
     }
-  }, [setLanguageSettings])
+  }, [setLanguageSettings, publicRoute])
 
   const appLocale = useMemo(
     () => resolveAppLocale(languageSettings, systemLocaleCandidates),

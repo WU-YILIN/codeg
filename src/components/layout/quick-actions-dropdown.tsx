@@ -4,7 +4,6 @@ import { useCallback, useState } from "react"
 import {
   FolderGit2,
   FolderOpenDot,
-  GamepadDirectional,
   Globe,
   LayoutTemplate,
   ListTodo,
@@ -16,6 +15,7 @@ import {
   Settings,
   Zap,
 } from "lucide-react"
+import { MantapalIcon } from "@/features/mantapal/icons"
 import { useTranslations } from "next-intl"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -47,8 +47,8 @@ import { RemoteWorkspaceManageDialog } from "./remote-workspace-manage-dialog"
 import { WorkspaceFolderDialog } from "./workspace-folder-dialog"
 
 /**
- * The quick-actions launcher pinned to the status bar's leading edge — the
- * window's bottom-left corner.
+ * The quick-actions launcher pinned to the status bar's trailing edge — the
+ * window's bottom-right corner.
  *
  * Every entry here already exists somewhere else (the sidebar's nav rows, the
  * folder-list context menu, the top-left chrome, the file tab strip's "+",
@@ -144,7 +144,7 @@ export function QuickActionsDropdown() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 shrink-0 hover:text-foreground/80"
+            className="h-6 w-auto px-2 shrink-0 gap-1.5 hover:text-foreground/80"
             title={t("title")}
             aria-label={t("title")}
           >
@@ -157,7 +157,8 @@ export function QuickActionsDropdown() {
                 rule. 0.875rem is also exactly the sidebar's nav-icon size, so
                 atop the bar's `pl-2` this glyph shares their leading edge, not
                 just their rail axis. */}
-            <GamepadDirectional aria-hidden="true" className="size-3.5" />
+            <MantapalIcon name="quick" className="size-3.5" />
+            <span className="hidden text-xs sm:inline">快捷操作</span>
           </Button>
         </DropdownMenuTrigger>
         {/* `side="top"`: the trigger sits on the window's bottom edge, so the

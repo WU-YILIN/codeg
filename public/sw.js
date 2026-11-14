@@ -60,13 +60,25 @@ const SHELL_PATH = "/index.html"
 // be cached whenever the shell is: offline, the redirect's client-side
 // fetch fails and Next falls back to a full navigation, which would land
 // back on the shell — a reload loop for as long as the server is away.
-const BOOT_DOCUMENTS = [SHELL_PATH, "/workspace", "/login"]
+const BOOT_DOCUMENTS = [
+  SHELL_PATH,
+  "/workspace",
+  "/login",
+  "/server-login",
+  "/policies",
+]
 
 // Same-origin GETs under these prefixes may be cached: Next's hashed
 // export output, the bundled Monaco under public/vs, and the app's own
 // icons and manifest. Everything else — page HTML routes, /api, /ws — is
 // served live. src/lib/service-worker.ts mirrors this list.
-const CACHEABLE_PREFIXES = ["/_next/static/", "/vs/", "/icon", "/manifest.json"]
+const CACHEABLE_PREFIXES = [
+  "/_next/static/",
+  "/vs/",
+  "/icon",
+  "/mantapal/",
+  "/manifest.json",
+]
 
 // Next names everything under here after its content, so a URL can never
 // change what it serves; Monaco's entry points, the icons and the manifest

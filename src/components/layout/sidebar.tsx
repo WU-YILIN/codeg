@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type ComponentType,
 } from "react"
 import {
   Crosshair,
@@ -14,15 +15,18 @@ import {
   FolderSync,
   ListChevronsDownUp,
   ListChevronsUpDown,
-  LayoutTemplate,
-  ListTodo,
-  Map as MapIcon,
   Menu,
   MessagesSquare,
-  SquarePen,
-  Zap,
-  type LucideIcon,
 } from "lucide-react"
+import { MantapalLogo } from "@/features/mantapal/brand"
+import { MantapalUserEntry } from "@/features/mantapal/account-page"
+import {
+  ChatIcon as SquarePen,
+  WorkflowIcon as Zap,
+  HistoryIcon as ListTodo,
+  ProjectsIcon as LayoutTemplate,
+  CanvasIcon as MapIcon,
+} from "@/features/mantapal/icons"
 import { useTranslations } from "next-intl"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useSidebarContext } from "@/contexts/sidebar-context"
@@ -121,7 +125,10 @@ const RECENT_HIDDEN: ReadonlySet<SidebarSectionId> = new Set(["recent"])
 // Icon per optional nav row. The visibility checkboxes in the view-options menu
 // carry the same glyph as the row they switch, so that group reads as a mirror
 // of the nav block rather than three bare labels.
-const NAV_ITEM_ICONS: Record<SidebarNavItemId, LucideIcon> = {
+const NAV_ITEM_ICONS: Record<
+  SidebarNavItemId,
+  ComponentType<{ className?: string }>
+> = {
   automations: Zap,
   tasks: ListTodo,
   forge: LayoutTemplate,
@@ -142,7 +149,7 @@ function SidebarNavButton({
   active,
   trailing,
 }: {
-  icon: LucideIcon
+  icon: ComponentType<{ className?: string }>
   label: string
   onClick: () => void
   active?: boolean
@@ -155,7 +162,7 @@ function SidebarNavButton({
       title={label}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex h-8 w-full items-center gap-[0.4375rem] rounded-full pl-[0.4375rem] pr-1.5",
+        "group flex h-8 w-full items-center gap-[0.4375rem] rounded-md pl-[0.4375rem] pr-1.5",
         "text-[0.875rem] text-sidebar-foreground outline-none",
         "transition-colors duration-150 hover:bg-sidebar-accent",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
@@ -341,7 +348,7 @@ export function Sidebar() {
   if (!isOpen) return null
 
   return (
-    <aside className="@container/sidebar flex h-full min-h-0 flex-col overflow-hidden text-sidebar-foreground select-none">
+    <aside className="@container/sidebar flex h-full min-h-0 flex-col overflow-hidden text-sidebar-foreground select-none mp-sidebar">
       <div
         className={cn(
           "flex h-10 shrink-0 items-center gap-2 pr-2",
@@ -374,6 +381,7 @@ export function Sidebar() {
             style={{ width: leftReserve }}
           />
         )}
+        <MantapalLogo className="mp-sidebar-logo" />
         {/* Draggable filler between the two clusters — the header is the
             window's top edge, so its empty space must move the window. */}
         <div data-tauri-drag-region className="h-full min-w-0 flex-1" />
@@ -688,6 +696,7 @@ export function Sidebar() {
           tagFilter={tagFilter}
         />
       </div>
+      <MantapalUserEntry />
     </aside>
   )
 }

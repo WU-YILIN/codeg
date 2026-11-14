@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { openSettingsWindow } from "@/lib/api"
 import { useActiveFolder } from "@/contexts/active-folder-context"
 import { useIsActiveChatMode } from "@/hooks/use-is-active-chat-mode"
 import { useSidebarContext } from "@/contexts/sidebar-context"
@@ -74,7 +73,7 @@ export function WorkspaceChromeController() {
     openBrowserTab,
     setActivePane,
   } = useWorkspaceActions()
-  const { openConversations } = useWorkbenchRoute()
+  const { openConversations, setRoute } = useWorkbenchRoute()
   const { shortcuts } = useShortcutSettings()
   // Search open-state is shared (see search-dialog-context): the trigger lives
   // in the sidebar, but this always-mounted controller owns the dialog and the
@@ -87,11 +86,7 @@ export function WorkspaceChromeController() {
   // native picker can't be a separate path that skips half the flow.
   const handleOpenFolder = useCallback(() => setBrowserOpen(true), [])
 
-  const handleOpenSettings = useCallback(() => {
-    openSettingsWindow().catch((err) => {
-      console.error("[WorkspaceChromeController] failed to open settings:", err)
-    })
-  }, [])
+  const handleOpenSettings = useCallback(() => setRoute("account"), [setRoute])
 
   // Close the current tab of the strip that belongs to `pane`. False when
   // there is none, which leaves ⌘W to the OS: it closes the window.

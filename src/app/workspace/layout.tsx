@@ -6,6 +6,7 @@ import {
 } from "@/stores/tab-store"
 import { leafIds } from "@/lib/tab-group-layout"
 import { useFolderTabsStore } from "@/stores/folder-tabs-store"
+import { MantapalAccountGate } from "@/features/mantapal/account-provider"
 import { BrowserEvalConfirm } from "@/components/browser/browser-eval-confirm"
 import { BrowserEventsBridge } from "@/components/browser/browser-events-bridge"
 import { BrowserScreenshotMarkupHost } from "@/components/browser/browser-screenshot-markup"
@@ -117,7 +118,9 @@ function WorkspaceDocumentTitle() {
   const { activeFolder } = useActiveFolder()
 
   useEffect(() => {
-    document.title = activeFolder ? `${activeFolder.name} - codeg` : "codeg"
+    document.title = activeFolder
+      ? `${activeFolder.name} · Mantapal`
+      : "Mantapal"
   }, [activeFolder])
 
   return null
@@ -1596,11 +1599,13 @@ export default function WorkspaceLayout({
 }) {
   return (
     <Suspense>
-      <RemoteConnectionGate>
-        <UpdateProvider>
-          <WorkspaceLayoutInner>{children}</WorkspaceLayoutInner>
-        </UpdateProvider>
-      </RemoteConnectionGate>
+      <MantapalAccountGate>
+        <RemoteConnectionGate>
+          <UpdateProvider>
+            <WorkspaceLayoutInner>{children}</WorkspaceLayoutInner>
+          </UpdateProvider>
+        </RemoteConnectionGate>
+      </MantapalAccountGate>
     </Suspense>
   )
 }

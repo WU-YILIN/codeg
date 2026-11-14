@@ -95,8 +95,8 @@ export function getCodegToken(): string {
 }
 
 export function redirectToCodegLogin(): void {
-  if (window.location.pathname.startsWith("/login")) return
+  if (window.location.pathname.startsWith("/server-login")) return
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(PROXY_AUTH_KEY)
-  window.location.href = "/login"
+  window.location.href = "/server-login"
 }

@@ -1,38 +1,26 @@
 {
-  "name": "codeg",
-  "short_name": "codeg",
-  "description": "AI Coding Agent Conversation Manager",
+  "name": "Mantapal",
+  "short_name": "Mantapal",
+  "description": "项目、会话和文件，都留在手边。",
   "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#09090b",
-  "theme_color": "#09090b",
+  "background_color": "#fdfdfb",
+  "theme_color": "#f1f3f4",
   "icons": [
     {
-      "src": "/icon-192x192.png",
+      "src": "/mantapal/app-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-maskable-192x192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/icon-512x512.png",
+      "src": "/mantapal/app-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "/icon-maskable-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ]
 }
